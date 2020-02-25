@@ -13,7 +13,7 @@ complexd* init(int n) {
 	complexd *A = new complexd[m];
 	double sum = 0;
 	unsigned int seed = omp_get_wtime();
-	#pragma omp parallel for shared(A, m) firstprivate(seed) private(i) reduction(+: sum)
+	#pragma omp parallel for firstprivate(seed) reduction(+: sum)
 		for (i = 0; i < m; ++i) {
 			seed+=omp_get_wtime();
 			A[i].real((rand_r(&seed) / (float) RAND_MAX) - 0.5);
@@ -31,13 +31,14 @@ complexd* init(int n) {
 complexd* f(complexd *A, int n, complexd *H, int k) {
 	unsigned long long i, m = 1 << n, l = 1 << (n - k);
 	complexd *B = new complexd[m];
-	#pragma omp parallel for shared(A, B, H, m, l) private(i)
-		for (i = 0; i < m; ++i)
-		if ((i & l) == 0){
-			B[i] =  H[0]*A[i & ~l] + H[1]*A[i | l];
-		}
-		else{
-			B[i] = H[2]*A[i & ~l] + H[3]*A[i | l];
+	#pragma omp parallel for
+		for (i = 0; i < m; ++i){
+			if ((i & l) == 0){
+				B[i] =  H[0]*A[i & ~l] + H[1]*A[i | l];
+			}
+			else{
+				B[i] = H[2]*A[i & ~l] + H[3]*A[i | l];
+			}
 		}
 	return B;
 }
