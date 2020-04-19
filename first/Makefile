@@ -1,5 +1,5 @@
 all:
-	g++ -fopenmp $^ -o $@
+	g++ -fopenmp $^ -o $@ -O2
 res: all
 	for n in 20 24 28 30; do \
 		for k in 1 4 $$n; do \
