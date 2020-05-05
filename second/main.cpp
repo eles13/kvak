@@ -7,19 +7,24 @@ typedef std::complex<double> complexd;
 
 int rank, size, size_2n;
 
-complexd* generate(int n)
+complexd* generate(int n, int argc)
 {
     unsigned long long m = 1LLU << (n - size_2n);
 	complexd *A = new complexd[m];
 	double sqr = 0, module;
-	unsigned int seed = time(0) + rank;
+	unsigned int seed;
+	if (argc != 4){
+        seed = time(0) + rank;
+	}else {
+        seed = rank;
+    }
 	for (unsigned long long i = 0; i < m; ++i) {
 		A[i].real((rand_r(&seed) / (float) RAND_MAX) - 0.5f);
 		A[i].imag((rand_r(&seed) / (float) RAND_MAX) - 0.5f);
 		sqr += abs(A[i] * A[i]);
 	}
 	MPI_Reduce(&sqr, &module, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-	if (!rank)
+	if (rank == 0)
 		module = sqrt(module);
 	MPI_Bcast(&module, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 	for (unsigned long long i = 0; i < m; ++i)
@@ -116,10 +121,10 @@ int main(int argc, char **argv)
     }
     n = atoi(argv[1]);
     k = atoi(argv[2]);
-    for (size_2n = 0; !((size >> size_2n) & 1); ++size_2n) {}
+    for (size_2n = 0; !((size >> size_2n) & 1); ++size_2n) ;
 	double time, maxtime;
 	MPI_Barrier(MPI_COMM_WORLD);
-	complexd *A = (argc > 4) ? read(argv[3], &n) : generate(n);
+	complexd *A = (argc > 4) ? read(argv[3], &n) : generate(n,argc);
 	complexd H[] = {1/sqrt(2), 1/sqrt(2), 1/sqrt(2), -1/sqrt(2)};
 	MPI_Barrier(MPI_COMM_WORLD);
 	time = MPI_Wtime();
