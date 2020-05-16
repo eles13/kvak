@@ -6,7 +6,14 @@
 
 typedef std::complex<double> complexd;
 
-int rank, size, size_2n;
+int rank, size;
+
+unsigned long long log_2(unsigned long long& m){
+    unsigned long long log;
+    for (log = 0; !((m >> log) & 1); ++log);
+    return log;
+}
+
 
 complexd *generate(int n, int argc) {
   unsigned long long m = 1LLU << (n - size_2n);
@@ -97,9 +104,9 @@ complexd *f(complexd *A, int n, int k, complexd *H) {
       }
     }
   } else {
-    unsigned long long l = 1LLU << (int)log2(m) - k;
+    unsigned long long l = 1LLU << log_2(m) - k;
     for (unsigned long long i = 0; i < m; i++) {
-      B[i] = ((i & l) >> ((int)log2(m) - k) == 0)
+      B[i] = ((i & l) >> (log_2(m) - k) == 0)
                  ? H[0] * A[i & ~l] + H[1] * A[i | l]
                  : H[2] * A[i & ~l] + H[3] * A[i | l];
     }
@@ -118,8 +125,6 @@ int main(int argc, char **argv) {
   }
   n = atoi(argv[1]);
   k = atoi(argv[2]);
-  for (size_2n = 0; !((size >> size_2n) & 1); ++size_2n)
-    ;
   double time, maxtime;
   MPI_Barrier(MPI_COMM_WORLD);
   complexd *A = (argc > 4) ? read(argv[3], &n) : generate(n, argc);
