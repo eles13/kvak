@@ -1,3 +1,4 @@
+#include <cmath>
 #include <complex>
 #include <cstdlib>
 #include <mpi.h>
@@ -51,6 +52,7 @@ complexd *read(char *f, int *n) {
     MPI_File_read(file, &num, 2, MPI_DOUBLE, MPI_STATUS_IGNORE);
     A[i].real(num[0]);
     A[i].imag(num[1]);
+    std::cout << rank << ' ' << i << ' ' << A[i] << std::endl;
   }
   MPI_File_close(&file);
   return A;
@@ -79,26 +81,28 @@ void write(char *args, complexd *B, int n) {
 }
 
 complexd *f(complexd *A, int n, int k, complexd *H) {
-  unsigned long long m = 1LLU << (n - size_2n);
+  unsigned long long m = (1LLU << n) / size;
   complexd *B = new complexd[m];
-  if (k > size_2n) {
-    unsigned long long l = 1LLU << (n - k);
-    for (unsigned long long i = 0; i < m; ++i)
-      B[i] = ((i & l) == 0) ? H[0] * A[i & ~l] + H[1] * A[i | l]
-                            : H[2] * A[i & ~l] + H[3] * A[i | l];
-  } else {
-    complexd *buf = new complexd[m];
-    int rank_ = rank ^ (1LLU << (size_2n - k));
-    MPI_Sendrecv(A, m, MPI_DOUBLE_COMPLEX, rank_, 0, buf, m, MPI_DOUBLE_COMPLEX,
+  int rank_ = ((rank * m) ^ (1LLU << (k - 1))) / m;
+  if (rank != rank_) {
+    MPI_Sendrecv(A, m, MPI_DOUBLE_COMPLEX, rank_, 0, B, m, MPI_DOUBLE_COMPLEX,
                  rank_, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     if (rank < rank_) {
-      for (unsigned long long i = 0; i < m; ++i)
-        B[i] = H[0] * A[i] + H[1] * buf[i];
+      for (unsigned long long i = 0; i < m; i++) {
+        B[i] = H[0] * A[i] + H[1] * B[i]
+      }
     } else {
-      for (unsigned long long i = 0; i < m; ++i)
-        B[i] = H[2] * buf[i] + H[3] * A[i];
+      for (unsigned long long i = 0; i < m; i++) {
+        B[i] = H[2] * B[i] + H[3] * A[i]
+      }
     }
-    delete[] buf;
+  } else {
+    unsigned long long l = 1LLU << (int)log2(m) - k;
+    for (unsigned long long i = 0; i < m; i++) {
+      B[i] = ((i & l) >> ((int)log2(m) - k) == 0)
+                 ? H[0] * A[i & ~l] + H[1] * A[i | l]
+                 : H[2] * A[i & ~l] + H[3] * A[i | l];
+    }
   }
   return B;
 }
@@ -110,7 +114,7 @@ int main(int argc, char **argv) {
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   if (argc < 3) {
     MPI_Finalize();
-    return 1; 
+    return 1;
   }
   n = atoi(argv[1]);
   k = atoi(argv[2]);
