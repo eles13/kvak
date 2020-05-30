@@ -6,7 +6,7 @@
 
 typedef std::complex<double> complexd;
 
-static int rank, size, log_size;
+static int rank, size, log_size, test;
 
 unsigned long long log_2(unsigned long long &m) {
   unsigned long long log;
@@ -100,7 +100,7 @@ double normal_dis_gen(unsigned int *seed) {
   return S - 6.;
 }
 
-complexd *adam(complexd *A, int n, double e) {
+complexd *adam(complexd *A, int n, double e, int argc) {
   unsigned long long m = (1LLU << n) / size;
   complexd *B = new complexd[m], *C = new complexd[m], H[4];
 #pragma omp parallel for schedule(guided)
@@ -108,7 +108,11 @@ complexd *adam(complexd *A, int n, double e) {
     B[i] = A[i];
   }
   double t;
-  unsigned int seed = time(0);
+  if (argc != 4) {
+    seed = time(0) + rank;
+  } else {
+    seed = rank;
+  }
   for (int k = 1; k <= n; ++k) {
     if (rank == 0) {
       t = normal_dis_gen(&seed);
@@ -182,9 +186,9 @@ int main(int argc, char **argv) {
   complexd *A = (argc > 4) ? read(argv[3], &n) : generate(n, argc);
   MPI_Barrier(MPI_COMM_WORLD);
   time[0] = MPI_Wtime();
-  complexd *B = adam(A, n, e);
+  complexd *B = adam(A, n, e, argc);
   time[0] = MPI_Wtime() - time[0];
-  complexd *C = adam(A, n, 0.0);
+  complexd *C = adam(A, n, 0.0, argc);
   delete[] A;
   MPI_Barrier(MPI_COMM_WORLD);
   time[1] = MPI_Wtime();
@@ -193,8 +197,11 @@ int main(int argc, char **argv) {
   loss = 1.0 - loss * loss;
   if (loss < 0.0)
     loss = 0.0;
-  if (argc > 3)
+  if (argc > 4) {
     write(argv[4], B, n);
+  } else if (argc == 4) {
+    write(argv[3], B, n);
+  }
   delete[] B;
   delete[] C;
   MPI_Reduce(time, maxtime, 2, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
